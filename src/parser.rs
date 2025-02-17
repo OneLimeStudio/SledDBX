@@ -1,4 +1,4 @@
-use std::{net::ToSocketAddrs, ops::Index, vec};
+
 use sled::Db;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
@@ -88,7 +88,7 @@ pub fn select(tokens : &Vec<&str> ) -> Result<(),sled::Error>{
     .collect();
     // for i  in data.iter()  {
     //     print!("{}",i);
-    // }
+    // }    
     let table_name = tokens[3];
     let db =Db::open(table_name)?;//YEa yEa
     match tokens[1] {
