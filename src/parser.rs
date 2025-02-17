@@ -2,6 +2,9 @@ use std::{net::ToSocketAddrs, ops::Index, vec};
 use sled::Db;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
+use std::fs;
+use std::io::Write;
+use std::fs::OpenOptions;
 #[derive(Debug)]
 enum Query {
     CreateTable {
@@ -11,7 +14,7 @@ enum Query {
     Insert {
         table: String,
         values: Vec<Value>,
-    },
+    }, 
     Select {
         table: String,
         columns: Vec<String>,
@@ -43,6 +46,7 @@ enum Condition {
 struct  Table{
     attribute_name : Vec<String>,
     attribute_type :Vec<DataType>,
+    
 }
 #[derive(Debug,Clone)]
 enum Value {
@@ -69,15 +73,51 @@ pub fn parse_query(query : &str) -> Result<(), String> {
         "CREATE" => {let x = create_parser(&tokens);
                     },
         "INSERT" => {let y = insert(&tokens);},
-        "SELECT" => select(),
+        "SELECT" => {let y = select(&tokens);},
         "DELETE" => delete(),
         _ => return  Err(String::from("No Such Query")),
     }
     Ok(())
     
 }
-fn select(){
-    
+pub fn select(tokens : &Vec<&str> ) -> Result<(),sled::Error>{
+    let data: Vec<String> = fs::read_to_string("src/primary_key.txt")
+    .expect("Unable to read file")
+    .split_whitespace()
+    .map(String::from) // Convert &str to String
+    .collect();
+    // for i  in data.iter()  {
+    //     print!("{}",i);
+    // }
+    let table_name = tokens[3];
+    let db =Db::open(table_name)?;//YEa yEa
+    match tokens[1] {
+        "*" => {
+            let table = GLOBAL_TABLE.lock().unwrap();
+            let n = if let Some(ref t) = *table {
+                 t.attribute_name.len()
+            }else{
+                0
+            };
+            for i in data.iter(){
+                let mut  j = 0;
+                while  j < n{
+                    if let Some(value) = db.get(format!("{}:{}",i,j.to_string()))?{
+                        let value_str = String::from_utf8(value.to_vec()).unwrap();
+                        println!("Value: {}", value_str);
+                    }
+                    j+=1;
+                    
+                }
+            }
+        },
+        _ => println!("No Such Identifier"),
+    }    
+    Ok(())
+}
+
+fn selectall(){
+
 }
 
 
@@ -181,6 +221,21 @@ fn insert(tokens: &[&str]) -> Result<(),sled::Error>{
 
 pub fn insert_record( v: Vec<Value>, PrimaryKey: Value, db: &Db) -> Result<(), sled::Error> {
     let set_key = PrimaryKey;
+    
+    let pk =  match set_key.clone() {
+        Value::Float(x) => x.to_string(),
+        Value::Int(x) => x.to_string(),
+        Value::String( x) => x,
+    };
+    let mut file = OpenOptions::new()
+        .create(true)  // Create file if it doesn't exist
+        .append(true)  // Append instead of overwriting
+        .open("src/primary_key.txt") // Use relative path
+        .expect("Unable to open file");
+
+    writeln!(file, "{}", pk).expect("Unable to write to file");
+
+    
 
     for (j, i) in v.iter().enumerate() {
        
@@ -190,12 +245,12 @@ pub fn insert_record( v: Vec<Value>, PrimaryKey: Value, db: &Db) -> Result<(), s
             Value::Int(x) => format!("{}:{}", x, j),    
 
         };
-        let xd = match set_key {
-            Value::Float(x) => println!("Primary KEy {}", x),  
-            Value::String(ref y) => {println!("Primary KEy {}", y)},   
-            Value::Int(x) => println!("Primary KEy {}", x),    
+        // let xd = match set_key {
+        //     Value::Float(x) => println!("Primary KEy {}", x),  
+        //     Value::String(ref y) => {println!("Primary KEy {}", y)},   
+        //     Value::Int(x) => println!("Primary KEy {}", x),    
 
-        };
+        // };
 
         let value = match i {
             Value::Float(x) => x.to_string().into_bytes(),
